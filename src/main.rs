@@ -1,21 +1,12 @@
 use std::fs::File;
 use std::io::Write;
 
+mod vector3;
+use vector3::Col;
+use vector3::Vector3;
+
 const WIDTH: usize = 680;
 const HEIGHT: usize = 480;
-
-#[derive(Debug, Clone, Copy)]
-struct Vector3 {
-    x: i32,
-    y: i32,
-    z: i32,
-}
-#[derive(Debug, Clone, Copy)]
-struct Col {
-    r: u8,
-    g: u8,
-    b: u8,
-}
 
 ///
 /// A very basic ray tracer.
@@ -23,7 +14,19 @@ struct Col {
 /// https://github.com/ssloy/tinyraytracer/wiki/Part-1:-understandable-raytracing
 ///
 fn main() -> std::io::Result<()> {
+    render()?;
+    Ok(())
+}
+
+fn render() -> std::io::Result<()> {
     let mut screen_buffer = vec![255; WIDTH * HEIGHT * 3];
+
+    let a = 5 * Vector3::new(5, 2, 1);
+    println!("{}, {}, {}", a.x, a.y, a.z);
+    let b = Vector3::new(5, 2, 1) + Vector3::new(5, 2, 1);
+    println!("{}, {}, {}", b.x, b.y, b.z);
+    let c = Vector3::new(5, 2, 1) - Vector3::new(5, 2, 1);
+    println!("{}, {}, {}", c.x, c.y, c.z);
 
     let mut file = File::create("output.ppm")?;
     println!("{}, ", screen_buffer.len());
@@ -50,7 +53,6 @@ fn main() -> std::io::Result<()> {
 
     writeln!(file, "P6\n{} {}\n255\n", WIDTH, HEIGHT)?;
     file.write_all(&output)?;
-
     Ok(())
 }
 
