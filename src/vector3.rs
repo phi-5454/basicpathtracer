@@ -1,6 +1,6 @@
 use core::f64;
 use rand::Rng;
-use rand_distr::StandardNormal;
+use rand_distr::{Normal, StandardNormal};
 use std::ops::{Add, Mul, Sub};
 
 #[derive(Debug, Clone, Copy)]
@@ -101,9 +101,10 @@ pub struct Camera {
 }
 
 pub trait Geometry {
-    // add code here
-    // Defines the intersection behaviour for a ray.
-    fn intersect(&self, origin: Vector3, dir: Vector3, z0: &mut f64) -> bool;
+    /// add code here
+    /// Defines the intersection behaviour for a ray.
+    /// Returns: option, (intersection depth, normal at intersection)
+    fn intersect(&self, origin: Vector3, dir: Vector3) -> Option<(f64, Vector3)>;
 }
 #[derive(Debug)]
 pub struct Sphere {
@@ -123,7 +124,8 @@ impl Geometry for Sphere {
     /// Ray-sphere intersection. Returns a boolean.
     /// References a depth value, used for depth culling.
     /// Assumes dir is normalized
-    fn intersect(&self, origin: Vector3, dir: Vector3, z0: &mut f64) -> bool {
+    /// returns [intersection found?, intersection depth, normal at point of intersection.]
+    fn intersect(&self, origin: Vector3, dir: Vector3) -> Option<(f64, Vector3)> {
         let l = self.center - origin; // origin to sphere center
         let tca = l * dir; // dot of ray dir, and that of origin to circle center
                            //println!("{}", tca);
@@ -133,21 +135,22 @@ impl Geometry for Sphere {
         if d2 > r2 {
             //println!("{}, {}, {}", d2 - r2, d2, r2);
             // distance grater than radius, no intersection
-            return false;
+            return None;
         }
         let thc: f64 = (r2 - d2).sqrt(); // radius
         let z = tca - thc; // Difference between radius and closest ray approach
         let z1 = tca + thc; // The new depth value
-        if z < 0.0 {
-            *z0 = z1;
+        if z < 0.0 && z1 < 0.0 {
+            return None;
+            //*z0 = z1;
         };
-        if *z0 < 0.0 {
+        /*if *z0 < 0.0 {
             // depth negative, cull (lies behind camera)
-            return false;
-        };
-        // TODO: remove side effects from this function
-        *z0 = z;
-        return true;
+            return None;
+        };*/
+        // Our vectors are in world space
+        let normal = origin + (z * dir) - self.center;
+        return Some((z, normal));
     }
 }
 

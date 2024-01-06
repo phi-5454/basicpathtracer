@@ -25,7 +25,7 @@ fn render() -> std::io::Result<()> {
     let mut screen_buffer = vec![255; WIDTH * HEIGHT * 3];
 
     let sphere = Sphere::new(Vector3::new(0.0, 0.0, -3.0), 1.0);
-    let sphere2 = Sphere::new(Vector3::new(1.0, 0.0, -3.0), 1.0);
+    let sphere2 = Sphere::new(Vector3::new(-2.0, -1.0, -3.0), 1.0);
     let geom = Renderable {
         material: Material::gray_mat(),
         geometry: Box::new(sphere),
@@ -82,11 +82,15 @@ fn intersect_scene(
 ) -> Option<Vector3> {
     let mut best = None;
     for g in scene {
-        let z = *z0;
-        if g.geometry.intersect(origin, dir, z0) {
-            if *z0 < z {
-                best = Some(g.material.base_col);
+        match g.geometry.intersect(origin, dir) {
+            Some((z, norm)) => {
+                if z < *z0 {
+                    *z0 = z;
+                    //best = Some(g.material.base_col);
+                    best = Some(norm);
+                }
             }
+            None => {}
         }
     }
     best
