@@ -1,6 +1,6 @@
 use core::f64;
 use rand::Rng;
-use rand_distr::{Normal, StandardNormal};
+use rand_distr::StandardNormal;
 use std::ops::{Add, Mul, Sub};
 
 #[derive(Debug, Clone, Copy)]
@@ -13,7 +13,7 @@ impl Vector3 {
     pub fn new(x: f64, y: f64, z: f64) -> Self {
         Vector3 { x, y, z }
     }
-    pub fn onunitsphere() -> Vector3 {
+    pub fn on_unit_sphere() -> Vector3 {
         let mut rng = rand::thread_rng();
         let x: f64 = rng.sample(StandardNormal);
         let y: f64 = rng.sample(StandardNormal);
@@ -37,10 +37,22 @@ impl Vector3 {
         let l = self.norm();
         Vector3::new(self.x / l, self.y / l, self.z / l)
     }
+    pub fn star(&self, other: Vector3) -> Vector3 {
+        Vector3::new(self.x * other.x, self.y * other.y, self.z * other.z)
+    }
+    pub fn lerp(a: Vector3, b: Vector3, value: f64) -> Vector3 {
+        let f = clamp(value, 0.0, 1.0);
+        ((1.0 - f) * a + f * b).normalize()
+    }
 }
 fn clamp(value: f64, min: f64, max: f64) -> f64 {
     value.max(min).min(max)
 }
+fn lerp(a: f64, b: f64, value: f64) -> f64 {
+    let f = clamp(value, 0.0, 1.0);
+    (1.0 - f) * a + f * b
+}
+
 impl Add for Vector3 {
     type Output = Self;
 
@@ -140,21 +152,24 @@ impl Geometry for Sphere {
         let thc: f64 = (r2 - d2).sqrt(); // radius
         let z = tca - thc; // Difference between radius and closest ray approach
         let z1 = tca + thc; // The new depth value
-        if z < 0.0 && z1 < 0.0 {
-            return None;
-            //*z0 = z1;
-        };
+        if z > 0.0 {
+            let normal = (origin + (z * dir) - self.center).normalize();
+            return Some((z, normal));
+        }
+        if z1 > 0.0 {
+            let normal = (origin + (z1 * dir) - self.center).normalize();
+            return Some((z1, normal));
+        }
         /*if *z0 < 0.0 {
             // depth negative, cull (lies behind camera)
             return None;
         };*/
         // Our vectors are in world space
-        let normal = origin + (z * dir) - self.center;
-        return Some((z, normal));
+        return None;
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Material {
     pub base_col: Vector3,
     pub emissive: Vector3,
@@ -176,14 +191,22 @@ impl Material {
         Material::new(
             Vector3::new(0.5, 0.5, 0.5),
             Vector3::new(0.0, 0.0, 0.0),
-            0.0,
+            0.5,
             0.0,
         )
     }
     pub fn bluish() -> Material {
         Material::new(
-            Vector3::new(0.0, 0.0, 0.5),
+            Vector3::new(0.2, 0.2, 0.5),
+            Vector3::new(0.1, 0.0, 0.0),
+            0.0,
+            0.0,
+        )
+    }
+    pub fn white_light() -> Material {
+        Material::new(
             Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(5.0, 5.0, 5.0),
             0.0,
             0.0,
         )
