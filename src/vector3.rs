@@ -53,6 +53,12 @@ fn lerp(a: f64, b: f64, value: f64) -> f64 {
     (1.0 - f) * a + f * b
 }
 
+// A normally-distributed random variable
+// Global functions may be the answer, in this case.
+fn rand_normal() -> f64 {
+    rand::thread_rng().sample(StandardNormal)
+}
+
 impl Add for Vector3 {
     type Output = Self;
 

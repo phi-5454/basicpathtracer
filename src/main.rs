@@ -1,9 +1,11 @@
 use std::fs::File;
 use std::io::Write;
 
-use std::thread;
+use std::thread::JoinHandle;
+use std::{thread, time};
 
 mod vector3;
+use rand::Rng;
 use vector3::*;
 
 mod tonemapper;
@@ -19,14 +21,76 @@ const MAX_SAMPLES: usize = 1000;
 /// Loosely based on ssloy's tinyraytracer:
 /// https://github.com/ssloy/tinyraytracer/wiki/Part-1:-understandable-raytracing
 ///
+/// TODO: Time it
 fn main() -> std::io::Result<()> {
     render()?;
     Ok(())
 }
 
 fn render() -> std::io::Result<()> {
+    // TODO: handle errors
+    // buffer against thread hiccups
+    let par = thread::available_parallelism().unwrap().get() * 4;
+    let pixels = WIDTH * HEIGHT;
+    // Generate pixel ranges for the threads
+    let ranges = (0..par)
+        .into_iter()
+        .map(|t| ((t * pixels) / par)..(((t + 1) * pixels) / par));
+    /*ranges.for_each(|r| {
+        let min = r.clone().min();
+        let max = r.max();
+        println!("{}..{}", &min.unwrap(), max.unwrap())
+    });*/
+    println!("Altogether {} (-1)", pixels);
+
     let mut screen_buffer = vec![255; WIDTH * HEIGHT * 3];
 
+    let mut file = File::create("output.ppm")?;
+    println!("{}, ", screen_buffer.len());
+
+    let a: Vec<_> = ranges
+        .map(move |t| {
+            println!("SPAWNING");
+            thread::spawn(move || {
+                //println!("{}, {}", t.clone().min().unwrap(), t.clone().max().unwrap());
+                (t.clone(), render_partial(&t))
+            })
+        })
+        .collect();
+
+    a.into_iter().for_each(|t| {
+        let a = t.join().expect("Some thread failed");
+        for i in a.0.clone() {
+            write_pixel_ind(i, a.1[i - a.0.clone().min().unwrap()], &mut screen_buffer)
+        }
+        println!("Joined: (something)");
+    });
+    println!("par: {}", par);
+    let r = 0..pixels;
+
+    //let camera: Camera = Camera {
+    //pos: Vector3::new(0.0, 0.0, 0.0),
+    //dir: Vector3::new(0.0, 1.0, 0.0),
+    //fov: (60.0),
+    //};
+
+    /*
+    for y in 0..HEIGHT {
+        for x in 0..WIDTH {}
+    }*/
+
+    let output = screen_buffer;
+    //let output = screen_buffer.iter().flat_map(|v| [v.x, v.y, v.z]);
+    //output.for_each(|a| print!("{}", a));
+
+    write!(file, "P6\n{} {}\n255\n", WIDTH, HEIGHT)?;
+    file.write_all(&output)?;
+    Ok(())
+}
+
+// Render a part of the image
+fn render_partial(pixel_indices: &std::ops::Range<usize>) -> Vec<Col> {
+    // This should not be here. Just a hack until I figure out sharing between threads
     let sphere = Sphere::new(Vector3::new(0.0, 0.0, -3.0), 1.0);
     let sphere2 = Sphere::new(Vector3::new(-1.0, -1.0, 0.2), 1.0);
     let sphere3 = Sphere::new(Vector3::new(2.0, -1.0, -2.0), 0.22);
@@ -50,41 +114,34 @@ fn render() -> std::io::Result<()> {
 
     let scene = vec![geom, geom2, geom3, geom4];
 
-    //let camera: Camera = Camera {
-    //pos: Vector3::new(0.0, 0.0, 0.0),
-    //dir: Vector3::new(0.0, 1.0, 0.0),
-    //fov: (60.0),
-    //};
+    let mut ret_vec = vec![
+        Col {
+            r: 255,
+            g: 255,
+            b: 255
+        };
+        pixel_indices.len()
+    ];
+    for i in pixel_indices.clone() {
+        let x = i % WIDTH;
+        let y = i / WIDTH;
 
-    let mut file = File::create("output.ppm")?;
-    println!("{}, ", screen_buffer.len());
+        // x and y offsets of the camera direction
+        let xoff = (2.0 * (x as f64 + 0.5) / (WIDTH as f64) - 1.0)
+            * (1.57 / 2.0 as f64).tan()
+            * (WIDTH as f64)
+            / (HEIGHT as f64);
+        let yoff = -(2.0 * (y as f64 + 0.5) / (HEIGHT as f64) - 1.0) * (1.57 / 2.0 as f64).tan();
 
-    for y in 0..HEIGHT {
-        for x in 0..WIDTH {
-            // x and y offsets of the camera direction
-            let xoff = (2.0 * (x as f64 + 0.5) / (WIDTH as f64) - 1.0)
-                * (1.57 / 2.0 as f64).tan()
-                * (WIDTH as f64)
-                / (HEIGHT as f64);
-            let yoff =
-                -(2.0 * (y as f64 + 0.5) / (HEIGHT as f64) - 1.0) * (1.57 / 2.0 as f64).tan();
+        let dir: Vector3 = Vector3::new(xoff, yoff, -1.0).normalize();
 
-            let dir: Vector3 = Vector3::new(xoff, yoff, -1.0).normalize();
-
-            //println!("{}, {}, {}", dir.x, dir.y, dir.z);
-            let c = gather_scene(Vector3::new(0.0, 0.0, 0.0), dir, &scene);
-            //+ cast_ray(Vector3::new(0.0, 0.0, 0.0), dir, &sphere2);
-            write_pixel(x, y, c.as_col(), &mut screen_buffer);
-        }
+        //println!("{}, {}, {}", dir.x, dir.y, dir.z);
+        let c = gather_scene(Vector3::new(0.0, 0.0, 0.0), dir, &scene);
+        //+ cast_ray(Vector3::new(0.0, 0.0, 0.0), dir, &sphere2);
+        ret_vec[i - pixel_indices.clone().min().unwrap()] = c.as_col();
+        //        write_pixel_ind(i, c.as_col(), &mut ret_vec);
     }
-
-    let output = screen_buffer;
-    //let output = screen_buffer.iter().flat_map(|v| [v.x, v.y, v.z]);
-    //output.for_each(|a| print!("{}", a));
-
-    write!(file, "P6\n{} {}\n255\n", WIDTH, HEIGHT)?;
-    file.write_all(&output)?;
-    Ok(())
+    ret_vec
 }
 
 /// returns: on hit: (hit material, hit normal)
@@ -185,7 +242,11 @@ fn sample_scene(origin: Vector3, dir: Vector3, scene: &Vec<Renderable>) -> Vecto
 fn gather_scene(origin: Vector3, dir: Vector3, scene: &Vec<Renderable>) -> Vector3 {
     let mut res = Vector3::new(0.0, 0.0, 0.0);
     for n in 1..=MAX_SAMPLES {
-        let col = sample_scene(origin, dir, scene);
+        let col = sample_scene(
+            origin,
+            (dir + 0.001 * Vector3::on_unit_sphere()).normalize(),
+            scene,
+        );
         let frac = 1.0 / (n as f64);
         res = frac * col + (1.0 - frac) * res
     }
@@ -197,6 +258,12 @@ fn write_pixel(x: usize, y: usize, col: Col, screen_buffer: &mut Vec<u8>) {
     screen_buffer[base_ind] = col.r;
     screen_buffer[base_ind + 1] = col.g;
     screen_buffer[base_ind + 2] = col.b;
+}
+fn write_pixel_ind(i: usize, col: Col, buffer: &mut Vec<u8>) {
+    let base_ind = 3 * i;
+    buffer[base_ind] = col.r;
+    buffer[base_ind + 1] = col.g;
+    buffer[base_ind + 2] = col.b;
 }
 
 fn ind_to_screenpos(index: usize) -> [usize; 2] {
