@@ -13,8 +13,8 @@ mod tonemapper;
 const WIDTH: usize = 680;
 const HEIGHT: usize = 480;
 
-const MAX_BOUNCES: usize = 5;
-const MAX_SAMPLES: usize = 1000;
+const MAX_BOUNCES: usize = 20;
+const MAX_SAMPLES: usize = 10000;
 
 ///
 /// A very basic ray tracer.
@@ -92,9 +92,11 @@ fn render() -> std::io::Result<()> {
 fn render_partial(pixel_indices: &std::ops::Range<usize>) -> Vec<Col> {
     // This should not be here. Just a hack until I figure out sharing between threads
     let sphere = Sphere::new(Vector3::new(0.0, 0.0, -3.0), 1.0);
-    let sphere2 = Sphere::new(Vector3::new(-1.0, -1.0, 0.2), 1.0);
-    let sphere3 = Sphere::new(Vector3::new(2.0, -1.0, -2.0), 0.22);
+    let sphere2 = Sphere::new(Vector3::new(-150.0, 100.0, -200.0), 50.0);
+    let sphere3 = Sphere::new(Vector3::new(1.8, -1.0, -2.0), 0.22);
     let sphere4 = Sphere::new(Vector3::new(2.0, 0.0, -3.0), 1.0);
+    let sphere5 = Sphere::new(Vector3::new(0.0, -41.0, -3.0), 40.0);
+    let sphere6 = Sphere::new(Vector3::new(-1.5, -0.3, -2.5), 0.8);
     let geom = Renderable {
         material: Material::gray_mat(),
         geometry: Box::new(sphere),
@@ -111,8 +113,16 @@ fn render_partial(pixel_indices: &std::ops::Range<usize>) -> Vec<Col> {
         material: Material::gray_mat(),
         geometry: Box::new(sphere4),
     };
+    let geom5 = Renderable {
+        material: Material::gray_mat(),
+        geometry: Box::new(sphere5),
+    };
+    let geom6 = Renderable {
+        material: Material::semirough(),
+        geometry: Box::new(sphere6),
+    };
 
-    let scene = vec![geom, geom2, geom3, geom4];
+    let scene = vec![geom, geom2, geom3, geom4, geom5, geom6];
 
     let mut ret_vec = vec![
         Col {
@@ -185,12 +195,15 @@ fn cast_ray(
             // TODO: Extract color calculation to separate function
             let newdir = new_dir(dir, norm, &mat);
             // emmissive contribution.
+            // Take lambertian falloff into account
             let cumcol = col_cum + mat.emissive.star(col_factor);
             // effect of surface color
             let tot_factor = col_factor.star(mat.base_col);
             (cumcol, tot_factor, Some((newpos, newdir)))
         }
         None => {
+            // Clear color acts as emissive does.
+            // TODO: Extract calculation into inline function
             let cumcol = col_cum + clear_col(dir).star(col_factor);
             (cumcol, col_factor, None)
         }
@@ -204,13 +217,15 @@ fn cast_ray(
 }
 
 fn clear_col(dir: Vector3) -> Vector3 {
-    Vector3::new(1.0, 1.0 * (-dir.y).max(0.0), 1.0 * (dir.y).max(0.0))
+    Vector3::new(0.2, 1.0 * (-dir.y).max(0.0), 1.0 * (dir.y).max(0.0))
 }
 
 // Calculate direction of bounced ray
 fn new_dir(d: Vector3, n: Vector3, mat: &Material) -> Vector3 {
     let res = Vector3::on_unit_sphere();
-    let diff = if (res * n) >= 0.0 { res } else { -1.0 * res };
+    //let diff = if (res * n) >= 0.0 { (res + n) } else { -1.0 * res };
+    let diff = (res + n).normalize();
+
     let spec = d - 2.0 * (d * n) * n;
     Vector3::lerp(spec, diff, mat.roughness)
     // Currently, just the reflection vector

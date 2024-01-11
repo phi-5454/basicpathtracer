@@ -1,6 +1,6 @@
 use core::f64;
 use rand::Rng;
-use rand_distr::StandardNormal;
+use rand_distr::{num_traits::Float, StandardNormal};
 use std::ops::{Add, Mul, Sub};
 
 #[derive(Debug, Clone, Copy)]
@@ -21,8 +21,9 @@ impl Vector3 {
         Vector3::new(x, y, z).normalize()
     }
     pub fn as_col(&self) -> Col {
+        // Apply gamma correction with sqrt
         fn col_cast(f: f64) -> u8 {
-            (clamp(f, 0.0, 1.0) * 255.0) as u8
+            (clamp(f, 0.0, 1.0).sqrt() * 255.0) as u8
         }
         Col {
             r: col_cast(self.x),
@@ -43,6 +44,13 @@ impl Vector3 {
     pub fn lerp(a: Vector3, b: Vector3, value: f64) -> Vector3 {
         let f = clamp(value, 0.0, 1.0);
         ((1.0 - f) * a + f * b).normalize()
+    }
+    pub fn cross(&self, other: Vector3) -> Vector3 {
+        Vector3::new(
+            self.y * other.z - self.z * other.y,
+            self.z * other.x - self.x * other.z,
+            self.x * other.y - self.y * other.x,
+        )
     }
 }
 fn clamp(value: f64, min: f64, max: f64) -> f64 {
@@ -124,6 +132,34 @@ pub trait Geometry {
     /// Returns: option, (intersection depth, normal at intersection)
     fn intersect(&self, origin: Vector3, dir: Vector3) -> Option<(f64, Vector3)>;
 }
+
+pub struct Plane {
+    position: Vector3,
+    normal: Vector3,
+}
+impl Plane {
+    pub fn new(position: Vector3, normal: Vector3) -> Self {
+        Plane { position, normal }
+    }
+}
+impl Geometry for Plane {
+    /// Ray-plane intersection. Returns an option(depth, ws_normal).
+    /// References a depth value, used for depth culling.
+    /// Assumes dir is normalized
+    /// returns [intersection found?, intersection depth, normal at point of intersection.]
+    fn intersect(&self, origin: Vector3, dir: Vector3) -> Option<(f64, Vector3)> {
+        let dotpr = dir * self.normal;
+        if dotpr <= 0.0 {
+            return None;
+        }
+        if (dotpr > -f64::EPSILON && dotpr < f64::EPSILON) {
+            return None;
+        }
+        // TODO: Implement
+        unimplemented!()
+    }
+}
+
 #[derive(Debug)]
 pub struct Sphere {
     center: Vector3,
@@ -131,11 +167,8 @@ pub struct Sphere {
 }
 
 impl Sphere {
-    pub fn new(center0: Vector3, radius0: f64) -> Self {
-        Sphere {
-            center: center0,
-            radius: radius0,
-        }
+    pub fn new(center: Vector3, radius: f64) -> Self {
+        Sphere { center, radius }
     }
 }
 impl Geometry for Sphere {
@@ -197,6 +230,14 @@ impl Material {
         Material::new(
             Vector3::new(0.5, 0.5, 0.5),
             Vector3::new(0.0, 0.0, 0.0),
+            1.0,
+            0.0,
+        )
+    }
+    pub fn semirough() -> Material {
+        Material::new(
+            Vector3::new(0.9, 0.3, 0.3),
+            Vector3::new(0.0, 0.0, 0.0),
             0.5,
             0.0,
         )
@@ -204,7 +245,7 @@ impl Material {
     pub fn bluish() -> Material {
         Material::new(
             Vector3::new(0.2, 0.2, 0.5),
-            Vector3::new(0.1, 0.0, 0.0),
+            Vector3::new(0.0, 0.0, 0.0),
             0.0,
             0.0,
         )
@@ -212,13 +253,22 @@ impl Material {
     pub fn white_light() -> Material {
         Material::new(
             Vector3::new(0.0, 0.0, 0.0),
-            Vector3::new(5.0, 5.0, 5.0),
+            Vector3::new(10.0, 10.0, 10.0),
+            0.0,
+            0.0,
+        )
+    }
+    pub fn yellowish_light() -> Material {
+        Material::new(
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(12.0, 12.0, 8.0),
             0.0,
             0.0,
         )
     }
 }
 
+// Don't really know how I could do this...
 //#[derive(Debug)]
 pub struct Renderable {
     pub material: Material,

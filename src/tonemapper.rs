@@ -1,6 +1,23 @@
+use rand_distr::num_traits::clamp;
+
 use crate::vector3::*;
 
 // TODO: A filmic tonemapper, ACES perhaps
+
+// An approximate ACES tonemapping.
+// From https://64.github.io/tonemapping/#aces
+/*
+pub fn aces_fit(col: Vector3) -> Vector3 {
+    let mut v = col.clone();
+    v = 0.6 * v;
+    let a = 2.51;
+    let b = 0.03;
+    let c = 2.43;
+    let d = 0.59;
+    let e = 0.14;
+    // The result will be clamped when converted into col.
+    (v.star(a * v + b)) / (v.star(c * v + d) + e)
+}*/
 
 pub fn reinhard(col: Vector3, max_luminance: f64) -> Vector3 {
     let l_old = luminance(col);
