@@ -3,6 +3,8 @@ use rand::Rng;
 use rand_distr::{num_traits::Float, StandardNormal};
 use std::ops::{Add, Mul, Sub};
 
+use crate::objloader::load_obj_file;
+
 #[derive(Debug, Clone, Copy)]
 pub struct Vector3 {
     pub x: f64,
@@ -126,6 +128,50 @@ pub struct Camera {
     pub fov: f64,
 }
 
+pub struct Mesh {
+    pos: Vector3,
+    scale: f64,
+    tris: Vec<Triangle>,
+}
+impl Mesh {
+    pub fn new(pos: Vector3, scale: f64, tris: Vec<Triangle>) -> Mesh {
+        Mesh { pos, scale, tris }
+    }
+    pub fn from(path: String, pos: Vector3, scale: f64) -> Mesh {
+        Mesh::new(pos, scale, load_obj_file(path))
+    }
+}
+impl Geometry for Mesh {
+    /// Ray-mesh intersection. Simply executes intersection for all triangles in mesh.
+    fn intersect(&self, origin: Vector3, dir: Vector3) -> Option<(f64, Vector3)> {
+        // Find best intersection
+        let mut best = None;
+        let mut best_depth = f64::MAX;
+        for t in &self
+            .tris
+            .iter()
+            .map(|t| {
+                Triangle::new(
+                    self.scale * t.a + self.pos,
+                    self.scale * t.b + self.pos,
+                    self.scale * t.c + self.pos,
+                )
+            })
+            .collect::<Vec<Triangle>>()
+        {
+            let res = t.intersect(origin, dir);
+            match res {
+                Some((d, _)) if d < best_depth => {
+                    best = res;
+                    best_depth = d;
+                }
+                _ => (),
+            }
+        }
+        best
+    }
+}
+
 pub trait Geometry {
     /// add code here
     /// Defines the intersection behaviour for a ray.
@@ -133,6 +179,7 @@ pub trait Geometry {
     fn intersect(&self, origin: Vector3, dir: Vector3) -> Option<(f64, Vector3)>;
 }
 
+/*
 pub struct Plane {
     position: Vector3,
     normal: Vector3,
@@ -158,7 +205,7 @@ impl Geometry for Plane {
         // TODO: Implement
         unimplemented!()
     }
-}
+}*/
 
 #[derive(Debug)]
 pub struct Sphere {
@@ -205,6 +252,62 @@ impl Geometry for Sphere {
         };*/
         // Our vectors are in world space
         return None;
+    }
+}
+
+#[derive(Debug)]
+pub struct Triangle {
+    a: Vector3,
+    b: Vector3,
+    c: Vector3,
+}
+impl Triangle {
+    // Vertices
+    pub fn new(a: Vector3, b: Vector3, c: Vector3) -> Self {
+        Triangle { a, b, c }
+    }
+}
+impl Geometry for Triangle {
+    /// Ray-triangle intersection. Returns a boolean.
+    /// From https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
+    /// References a depth value, used for depth culling.
+    /// Assumes dir is normalized
+    /// returns [intersection found?, intersection depth, normal at point of intersection.]
+    fn intersect(&self, origin: Vector3, dir: Vector3) -> Option<(f64, Vector3)> {
+        let ab = self.b - self.a;
+        let ac = self.c - self.a;
+        let n: Vector3 = ac.cross(ab).normalize();
+        if n * dir < 0.0 {
+            return None;
+        }
+
+        let d_cross_ac = dir.cross(ac);
+        let det = ab * d_cross_ac;
+
+        if det > -f64::EPSILON && det < f64::EPSILON {
+            return None; // Ray is parallel to this triangle.
+        }
+
+        let inv_det = 1.0 / det;
+        let s = origin - self.a;
+        let u = inv_det * s * d_cross_ac;
+        if u < 0.0 || u > 1.0 {
+            return None;
+        }
+
+        let s_cross_ab = s.cross(ab);
+        let v = inv_det * (dir * s_cross_ab);
+        if v < 0.0 || u + v > 1.0 {
+            return None;
+        }
+        // depth of intersection (t is the parameter)
+        let t = inv_det * (ac * s_cross_ab);
+
+        if t > f64::EPSILON {
+            Some((t, n))
+        } else {
+            None
+        }
     }
 }
 

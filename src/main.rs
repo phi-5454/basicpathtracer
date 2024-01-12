@@ -1,20 +1,21 @@
 use std::fs::File;
 use std::io::Write;
 
-use std::thread::JoinHandle;
-use std::{thread, time};
+use std::thread;
 
 mod vector3;
-use rand::Rng;
+use objloader::load_obj_file;
 use vector3::*;
 
-mod tonemapper;
+mod objloader;
+
+//mod tonemapper;
 
 const WIDTH: usize = 680;
 const HEIGHT: usize = 480;
 
-const MAX_BOUNCES: usize = 20;
-const MAX_SAMPLES: usize = 10000;
+const MAX_BOUNCES: usize = 1;
+const MAX_SAMPLES: usize = 1;
 
 ///
 /// A very basic ray tracer.
@@ -121,8 +122,16 @@ fn render_partial(pixel_indices: &std::ops::Range<usize>) -> Vec<Col> {
         material: Material::semirough(),
         geometry: Box::new(sphere6),
     };
+    let geom_bunny = Renderable {
+        material: Material::semirough(),
+        geometry: Box::new(Mesh::from(
+            "./bunny.obj".to_string(),
+            Vector3::new(0.0, 0.0, -1.0),
+            3.0,
+        )),
+    };
 
-    let scene = vec![geom, geom2, geom3, geom4, geom5, geom6];
+    let scene = vec![geom, geom2, geom3, geom4, geom5, geom6, geom_bunny];
 
     let mut ret_vec = vec![
         Col {
