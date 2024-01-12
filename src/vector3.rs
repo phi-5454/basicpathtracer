@@ -276,8 +276,8 @@ impl Geometry for Triangle {
     fn intersect(&self, origin: Vector3, dir: Vector3) -> Option<(f64, Vector3)> {
         let ab = self.b - self.a;
         let ac = self.c - self.a;
-        let n: Vector3 = ac.cross(ab).normalize();
-        if n * dir < 0.0 {
+        let n: Vector3 = ab.cross(ac).normalize();
+        if -1.0 * n * dir < 0.0 {
             return None;
         }
 
