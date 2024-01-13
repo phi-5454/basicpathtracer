@@ -14,8 +14,8 @@ mod objloader;
 const WIDTH: usize = 680;
 const HEIGHT: usize = 480;
 
-const MAX_BOUNCES: usize = 3;
-const MAX_SAMPLES: usize = 20;
+const MAX_BOUNCES: usize = 5;
+const MAX_SAMPLES: usize = 100;
 
 ///
 /// A very basic ray tracer.
@@ -123,10 +123,10 @@ fn render_partial(pixel_indices: &std::ops::Range<usize>) -> Vec<Col> {
         geometry: Box::new(sphere6),
     };
     let geom_bunny = Renderable {
-        material: Material::gray_mat(),
+        material: Material::semirough(),
         geometry: Box::new(Mesh::from(
             "./bunny.obj".to_string(),
-            Vector3::new(0.3, -1.0, -2.0),
+            Vector3::new(0.5, -1.2, -2.5),
             8.0,
         )),
     };
