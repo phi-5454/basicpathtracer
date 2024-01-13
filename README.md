@@ -26,7 +26,7 @@ For a debug build, from anywhere within the project, run `cargo run`. The output
 ### Some examples of renders:
 
 ![An example render](output.png)\
-_A simple scene. 20 bounces, 10000 samples_\
+_A simple scene. 20 bounces, 10000 samples_
 
 ![An (more complex) render](bunnyrender.png)\
 _A scene with a famous rabbit. 5 bounces, 100 samples. Note that the rabbit is levitating slightly._
